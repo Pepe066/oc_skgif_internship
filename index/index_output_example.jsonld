@@ -1,0 +1,63 @@
+{
+    "@context": [
+        "https://w3id.org/skg-if/context/skg-if.json",
+        {
+            "@base": "https://w3id.org/skg-if/sandbox/oc/",
+            "skg": "https://w3id.org/skg-if/sandbox/oc/"
+        }
+    ],
+    "@graph": [
+        {
+            "local_identifier": "https://w3id.org/oc/meta/br/06101801781",
+            "identifiers": [
+                {
+                    "scheme": "doi",
+                    "value": "10.7717/peerj-cs.421"
+                },
+                {
+                    "scheme": "omid",
+                    "value": "br/06101801781"
+                },
+                {
+                    "scheme": "openalex",
+                    "value": "W3134956838"
+                },
+                {
+                    "scheme": "pmid",
+                    "value": "33817056"
+                }
+            ],
+            "manifestations": [
+                {
+                    "dates": {
+                        "publication": "2021-03-10T00:00:00+00:00"
+                    }
+                }
+            ],
+            "related_products": {
+                "cites": ["https://w3id.org/oc/meta/br/06101802023"]
+            }
+        },
+        {
+            "local_identifier": "https://w3id.org/oc/meta/br/06101802023",
+            "identifiers": [
+                {
+                    "scheme": "doi",
+                    "value": "10.7287/peerj.preprints.26727v1"
+                },
+                {
+                    "scheme": "doi",
+                    "value": "10.7717/peerj-cs.163"
+                },
+                {
+                    "scheme": "omid",
+                    "value": "br/06101802023"
+                },
+                {
+                    "scheme": "pmid",
+                    "value": "33816816"
+                }
+            ]
+        }
+    ]
+}
