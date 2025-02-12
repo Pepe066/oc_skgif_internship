@@ -35,7 +35,7 @@
                 }
             ],
             "related_products": {
-                "cites": ["https://w3id.org/oc/meta/br/06101802023"]
+                "cites": ["https://w3id.org/oc/meta/br/06101802023","https://w3id.org/oc/meta/br/061202127823","https://w3id.org/oc/meta/br/061202127742"]
             }
         },
         {
@@ -56,6 +56,36 @@
                 {
                     "scheme": "pmid",
                     "value": "33816816"
+                }
+            ]
+        },
+        {
+            "local_identifier": "https://w3id.org/oc/meta/br/061202127823",
+            "identifiers": [
+                {
+                    "scheme": "doi",
+                    "value": "10.1007/s11192-020-03690-4"
+                },
+                {
+                    "scheme": "omid",
+                    "value": "br/061202127823"
+                },
+                {
+                    "scheme": "pmid",
+                    "value": "32981987"
+                }
+            ]
+        },
+        {
+            "local_identifier": "https://w3id.org/oc/meta/br/061202127742",
+            "identifiers": [
+                {
+                    "scheme": "doi",
+                    "value": "10.1007/s11192-020-03792-z"
+                },
+                {
+                    "scheme": "omid",
+                    "value": "br/061202127742"
                 }
             ]
         }
