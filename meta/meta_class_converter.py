@@ -1,11 +1,10 @@
-from json import load, dump, dumps
-from re import sub, findall
-from datetime import timezone, datetime
 import argparse
+import json
+import re
+from datetime import timezone, datetime
 
 class MetaClassConverter:
-    def __init__(self):
-
+    def __init__(self, json_data):
         self.base = "https://w3id.org/oc/meta/" 
         self.type_mapping = {
             "journal article": "http://purl.org/spar/fabio/JournalArticle",
@@ -15,7 +14,18 @@ class MetaClassConverter:
             "journal article": "journal",
             "book chapter": "book"
         }
-    
+        self.json_data = json_data
+        self.context = {
+            "@context": [
+                "https://w3id.org/skg-if/context/skg-if.json",
+                {
+                    "@base": "https://w3id.org/skg-if/sandbox/oc/",
+                    "skg": "https://w3id.org/skg-if/sandbox/oc/"
+                }
+            ],
+            "@graph": []
+        }
+
     def get_datetime(self, datetime_string):
         try:
             dt = datetime.strptime(datetime_string, "%Y-%m-%d")
@@ -24,23 +34,20 @@ class MetaClassConverter:
                 dt = datetime.strptime(datetime_string, "%Y-%m")
             except:
                 dt = datetime.strptime(datetime_string, "%Y")
-        
+
         return dt.replace(tzinfo=timezone.utc).isoformat()
 
-    
     def get_omid_url(self, string):
-        return sub("^.*omid:([^ ]+).*$", self.base + "\\1", string)
-    
+        return re.sub(r"^.*omid:([^ ]+).*$", self.base + r"\1", string)
+
     def create_contributors(self, contributor_list, contributor_type):
-        contributors = []
-        agents = []
-        
+        contributors, agents = [], []
         contributor_rank = 0
+        
         for contributor in contributor_list:
-            if contributor != "":
+            if contributor:
                 contributor_rank += 1
-                # Attempt to match the name and identifier
-                match = findall("^(.+) \\[(.+)\\]$", contributor)
+                match = re.findall(r"^(.+) \[(.+)\]$", contributor)
                 if match:
                     name, ids = match[0]
                     contributor_omid = self.get_omid_url(ids)
@@ -49,183 +56,120 @@ class MetaClassConverter:
                         "by": contributor_omid,
                         "role": contributor_type
                     }
-
                     if contributor_type != "publisher":
                         contributor_object["rank"] = contributor_rank
 
                     contributors.append(contributor_object)
 
-                    agent_object = {
-                        "local_identifier": contributor_omid,
-                    }
-
+                    agent_object = {"local_identifier": contributor_omid}
                     self.create_identifiers(ids, agent_object)
 
-                    # Handling name and entity type
                     if ", " in name:
                         agent_object["entity_type"] = "person"
-
                         fn, gn = name.split(", ")
-                        if gn:
-                            agent_object["given_name"] = gn
-                        if fn:
-                            agent_object["family_name"] = fn
+                        if gn: agent_object["given_name"] = gn
+                        if fn: agent_object["family_name"] = fn
                     else:
-                        if contributor_type == "publisher":
-                            agent_object["entity_type"] = "organisation"
-                        else:
-                            agent_object["entity_type"] = "agent"
-                        
-                        if name:
-                            agent_object["name"] = name
+                        agent_object["entity_type"] = "organisation" if contributor_type == "publisher" else "agent"
+                        if name: agent_object["name"] = name
 
                     agents.append(agent_object)
 
         return contributors, agents
 
-    
-    def create_identifiers(self,identifiers, entity):
-        for identifier in identifiers.split(" "):
+    def create_identifiers(self, identifiers, entity):
+        for identifier in identifiers.split():
             if "identifiers" not in entity:
                 entity["identifiers"] = []
-            
             scheme, value = identifier.split(":", 1)
-            entity["identifiers"].append(
-                {
-                    "scheme": scheme,
-                    "value": value
-                }
+            entity["identifiers"].append({"scheme": scheme, "value": value})
+
+    def convert(self):
+        with open(self.json_data, "r", encoding="utf-8") as f:
+            oc_json = json.load(f)
+
+        for item in oc_json:
+            research_product = {"entity_type": "product"}
+            self.context["@graph"].append(research_product)
+
+            research_product["local_identifier"] = self.get_omid_url(item["id"])
+            self.create_identifiers(item["id"], research_product)
+
+            research_product["product_type"] = (
+                "research data" if item["type"] in ("data file", "dataset") else
+                "research software" if item["type"] == "software" else
+                "literature"
             )
 
-parser = argparse.ArgumentParser(
-prog='JSON OCDM API format to JSON-LD SKG-IF converter')
-parser.add_argument("input")
-parser.add_argument("output")
-args = parser.parse_args()
+            if "title" in item and item["title"]:
+                research_product["titles"] = {"none": item["title"]}
 
-with open(args.input, "r", encoding="utf-8") as f:
-    oc_json = load(f)
+            authors, author_agents = self.create_contributors(item["author"].split("; "), "author")
+            editors, editor_agents = self.create_contributors(item["editor"].split("; "), "editor")
+            publishers, publisher_agents = self.create_contributors(item["publisher"].split("; "), "publisher")
 
-    g = [] 
+            research_product["contributions"] = authors + editors + publishers
+            self.context["@graph"].extend(agent for agent in author_agents + editor_agents + publisher_agents if agent not in self.context["@graph"])
 
-    result = {
-        "@context": [ 
-            "https://w3id.org/skg-if/context/skg-if.json",
-            { 
-                "@base": "https://w3id.org/skg-if/sandbox/oc/",
-                "skg": "https://w3id.org/skg-if/sandbox/oc/"
-            }
-        ],
-        "@graph": g
-    }
-
-    converter = MetaClassConverter()
-
-    for item in oc_json:
-        research_product = {
-            "entity_type": "product"
-        }
-        g.append(research_product)
-
-        # local identifier
-        research_product["local_identifier"] = converter.get_omid_url(item["id"])
-
-        # identifiers
-        converter.create_identifiers(item["id"], research_product)
-
-        # product type
-        if item["type"] in ("data file", "dataset"):
-            research_product["product_type"] = "research data"
-        elif item["type"] in ("software"):
-            research_product["product_type"] = "research software"
-        else:
-            research_product["product_type"] = "literature"
-
-        # titles
-        if "title" in item and item["title"] != "":
-            research_product["titles"] = {
-                "none": item["title"]
-            }
-
-        # contributions
-        authors, author_agents = converter.create_contributors(item["author"].split("; "), "author")
-        editors, editor_agents = converter.create_contributors(item["editor"].split("; "), "editor")
-        publishers, publisher_agents = converter.create_contributors(item["publisher"].split("; "), "publisher")
-
-        research_product["contributions"] = authors + editors + publishers
-
-        for agent in author_agents + editor_agents + publisher_agents:
-            if agent not in g:
-                g.append(agent)
-
-        # manifestations
-        manifestation = {
-            "type": {
-                "class": converter.type_mapping[item["type"]],
-                "labels": {
-                    "en": item["type"]
-                },
-                "defined_in": "http://purl.org/spar/fabio"
-            }
-        }
-
-        converter.create_identifiers(item["id"], manifestation)
-
-        if item["pub_date"] != "":
-            manifestation["dates"] = {
-                "publication": converter.get_datetime(item["pub_date"])
-            }
-
-        if item["volume"] != "" or item["page"] != "" or item["venue"] != "" or item["issue"] != "":
-            manifestation["biblio"] = {}
-
-            if item["issue"] != "":
-                manifestation["biblio"]["issue"] = item["issue"]
-
-            if item["volume"] != "":
-                manifestation["biblio"]["volume"] = item["volume"]
-
-            if item["page"] != "":
-                sp, ep = item["page"].split("-")
-                manifestation["biblio"]["pages"] = {
-                    "first": sp,
-                    "last": ep
+            manifestation = {
+                "type": {
+                    "class": self.type_mapping.get(item["type"], ""),
+                    "labels": {"en": item["type"]},
+                    "defined_in": "http://purl.org/spar/fabio"
                 }
+            }
+            self.create_identifiers(item["id"], manifestation)
 
-            if item["venue"] != "":
-                name, ids = findall("^(.+) \\[(.+)\\]$", item["venue"])[0]
-                venue_omid = converter.get_omid_url(ids)
+            if item["pub_date"]:
+                manifestation["dates"] = {"publication": self.get_datetime(item["pub_date"])}
 
-                manifestation["biblio"]["in"] = venue_omid
+            if any(item.get(k) for k in ("volume", "page", "venue", "issue")):
+                manifestation["biblio"] = {}
+                if item["issue"]: manifestation["biblio"]["issue"] = item["issue"]
+                if item["volume"]: manifestation["biblio"]["volume"] = item["volume"]
+                if item["page"]:
+                    sp, ep = item["page"].split("-")
+                    manifestation["biblio"]["pages"] = {"first": sp, "last": ep}
+                if item["venue"]:
+                    match = re.findall(r"^(.+) \[(.+)\]$", item["venue"])
+                    if match:
+                        name, ids = match[0]
+                        venue_omid = self.get_omid_url(ids)
+                        manifestation["biblio"]["in"] = venue_omid
 
-                venue_object = {
-                    "local_identifier": venue_omid,
-                    "entity_type": "venue",
-                    "title": name,
-                    "type": converter.venue_mapping[item["type"]]
-                }
+                        venue_object = {
+                            "local_identifier": venue_omid,
+                            "entity_type": "venue",
+                            "title": name,
+                            "type": self.venue_mapping.get(item["type"], "")
+                        }
+                        self.create_identifiers(ids, venue_object)
 
-                converter.create_identifiers(ids, venue_object)
+                        if editors and self.venue_mapping.get(item["type"]) == "book":
+                            venue_object.setdefault("contributions", []).extend(editors)
+                        if publishers:
+                            venue_object.setdefault("contributions", []).extend(publishers)
 
-                if len(editors) and converter.venue_mapping[item["type"]] in ("book"):
-                    if "contributions" not in venue_object:
-                        venue_object["contributions"] = []
-                    venue_object["contributions"].extend(editors)
+                        self.context["@graph"].append(venue_object)
 
-                if len(publishers):
-                    if "contributions" not in venue_object:
-                        venue_object["contributions"] = []
-                    venue_object["contributions"].extend(publishers)
+            research_product["manifestations"] = [manifestation]
 
-                g.append(venue_object)
+    def save(self, output_file):
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(self.context, f, ensure_ascii=False, indent=4)
+        
 
-        research_product["manifestations"] = [manifestation]
+def main():
+    parser = argparse.ArgumentParser(description="Convert JSON OCDM API format to JSON-LD SKG-IF")
+    parser.add_argument("input_file", help="Path to the JSON input file")
+    parser.add_argument("output_file", help="Path to save the JSON-LD output file")
+    args = parser.parse_args()
 
-    # Write the output file
-    with open(args.output, "w", encoding="utf-8") as f:
-        dump(result, f, ensure_ascii=False, indent=4)
+    converter = MetaClassConverter(args.input_file)
+    converter.convert()
+    converter.save(args.output_file)
 
-    print(dumps(result, ensure_ascii=False, indent=4))
-                
+    print(f"JSON-LD saved to {args.output_file}")
 
-    
+if __name__ == "__main__":
+    main()
