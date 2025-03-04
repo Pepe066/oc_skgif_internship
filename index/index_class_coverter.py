@@ -84,7 +84,7 @@ class IndexJSONLDConverter:
                 "local_identifier": self.create_omid_url(item["cited"].split()[0]),
                 "identifiers": self.create_identifiers(item["cited"]),   
             }
-            if "timespan" in item:  
+            if "timespan" in item and "creation" in item: 
                 cited_product["manifestations"] = self.create_manifestations_cited(item["creation"], item["timespan"])
 
             self.context["@graph"].append(cited_product)
