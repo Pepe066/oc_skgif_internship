@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 
 
-class IndexJSONLDConverter:
+class IndexClassConverter:
     def __init__(self, json_data):
         self.base = "https://w3id.org/oc/index/"
         self.json_data = json_data
@@ -93,7 +93,6 @@ class IndexJSONLDConverter:
         with open(output_file, "w", encoding="utf-8") as f:
             dump(self.context, f, indent=2, ensure_ascii=False)
 
-# Usage
 
 def main():
     parser = argparse.ArgumentParser(description="Convert JSON to JSON-LD format")
@@ -101,7 +100,7 @@ def main():
     parser.add_argument("output_file", help="Path to save the JSON-LD output file")
     args = parser.parse_args()
 
-    converter = IndexJSONLDConverter(args.input_file)
+    converter = IndexClassConverter(args.input_file)
     converter.convert()
     converter.save(args.output_file)
 
