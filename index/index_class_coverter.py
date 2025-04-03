@@ -6,9 +6,8 @@ from dateutil.relativedelta import relativedelta
 
 
 class IndexClassConverter:
-    def __init__(self, json_data):
+    def __init__(self):
         self.base = "https://w3id.org/oc/index/"
-        self.json_data = json_data
 
         self.context = {
             "@context": [
@@ -63,9 +62,11 @@ class IndexClassConverter:
             if "omid" in item:
                 return self.create_omid_url(item)
                 
-    def convert(self):
-        with open(self.json_data, "r", encoding="utf-8") as f:
+    def convert(self, json_data):
+        with open(json_data, "r", encoding="utf-8") as f:
             oc_json = load(f)
+
+        self.context["@graph"] = []
 
         first_product = oc_json[0]
 
@@ -100,8 +101,8 @@ def main():
     parser.add_argument("output_file", help="Path to save the JSON-LD output file")
     args = parser.parse_args()
 
-    converter = IndexClassConverter(args.input_file)
-    converter.convert()
+    converter = IndexClassConverter()
+    converter.convert(args.input_file)
     converter.save(args.output_file)
 
     print(f"JSON-LD saved to {args.output_file}")
